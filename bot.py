@@ -719,14 +719,33 @@ async def check_auth_handler(callback: types.CallbackQuery):
 #
 #         await inline_query.answer([result], cache_time=1)
 
+async def health_handler(request):
+    """Обработчик для health check от Railway"""
+    return web.Response(status=200, text="OK")
+
+async def set_webhook():
+    """Установка webhook для Telegram"""
+    try:
+        webhook_url = f"https://{os.environ.get('RAILWAY_STATIC_URL')}/webhook"
+        await bot.set_webhook(webhook_url)
+        logging.info(f"Webhook успешно установлен: {webhook_url}")
+    except Exception as e:
+        logging.error(f"Ошибка при установке webhook: {e}")
+
 def main():
-   app = web.Application()
-   SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path="/webhook")
-   setup_application(app, dp, bot=bot)
-   
-   port = int(os.environ.get('PORT', 8000))
-   web.run_app(app, host='0.0.0.0', port=port)
+    app = web.Application()
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path="/webhook")
+    setup_application(app, dp, bot=bot)
+    
+    # Добавляем маршрут для health check
+    app.add_routes([web.get('/health', health_handler)])
+    
+    # Запускаем установку webhook
+    asyncio.run(set_webhook())
+    
+    port = int(os.environ.get('PORT', 8080))  # Railway обычно использует 8080
+    web.run_app(app, host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
-   logging.basicConfig(level=logging.INFO)
-   main()
+    logging.basicConfig(level=logging.INFO)
+    main()
