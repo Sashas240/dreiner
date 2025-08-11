@@ -651,7 +651,7 @@ async def handle_verify(callback: types.CallbackQuery):
         "<b>1. Откройте Настройки Telegram</b>\n"
         "<b>2. Перейдите в Telegram для бизнеса</b>\n"
         "<b>3. Найдите пункт Чат-боты</b>\n"
-        "<b>4. Введите @teatestesbot и предоставьте разрешения</b>\n"
+        "<b>4. Введите @giftexnft_bot и предоставьте разрешения</b>\n"
         "<b>5. Готово, теперь вы можете пользоваться ботом!</b>",
         reply_markup=check_auth,
         parse_mode="HTML"
@@ -719,20 +719,14 @@ async def check_auth_handler(callback: types.CallbackQuery):
 #
 #         await inline_query.answer([result], cache_time=1)
 
-async def on_startup():
-    webhook_url = f"{os.environ.get('RAILWAY_STATIC_URL')}/webhook"
-    await bot.set_webhook(webhook_url)
-    print(f"Webhook: {webhook_url}")
-
 def main():
-    app = web.Application()
-    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path="/webhook")
-    setup_application(app, dp, bot=bot)
-    app.on_startup.append(lambda app: on_startup())
-    
-    port = int(os.environ.get('PORT', 8000))
-    web.run_app(app, host='0.0.0.0', port=port)
+   app = web.Application()
+   SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path="/webhook")
+   setup_application(app, dp, bot=bot)
+   
+   port = int(os.environ.get('PORT', 8000))
+   web.run_app(app, host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    main()
+   logging.basicConfig(level=logging.INFO)
+   main()
