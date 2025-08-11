@@ -7,7 +7,7 @@ from aiogram.types import InputMediaPhoto, FSInputFile
 from aiogram.types import InlineQuery, InlineQueryResultArticle, InputTextMessageContent
 from custom_methods import GetFixedBusinessAccountStarBalance
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-from aiogram.exceptions import TelegramBadRequest  # Заменили TelegramTooManyRequests
+from aiogram.exceptions import TelegramBadRequest
 from aiohttp import web
 import logging
 import asyncio
@@ -743,7 +743,7 @@ async def set_webhook():
                 return
             except TelegramBadRequest as e:
                 if "Too Many Requests" in str(e):
-                    retry_after = 1  # Telegram обычно возвращает 1 сек, можно улучшить парсинг
+                    retry_after = 1
                     logging.warning(f"Флуд-контроль Telegram, повтор через {retry_after} сек, попытка {attempt + 1}/{max_retries}")
                     await asyncio.sleep(retry_after)
                 else:
@@ -756,7 +756,8 @@ async def set_webhook():
     except Exception as e:
         logging.error(f"Ошибка при проверке/установке webhook: {e}")
 
-def main():
+async def start_app():
+    """Запуск приложения с установкой webhook"""
     app = web.Application()
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path="/webhook")
     setup_application(app, dp, bot=bot)
@@ -764,11 +765,25 @@ def main():
     # Добавляем маршрут для health check
     app.add_routes([web.get('/health', health_handler)])
     
-    # Запускаем установку webhook
-    asyncio.run(set_webhook())
+    # Устанавливаем webhook
+    await set_webhook()
     
+    # Запускаем веб-сервер
     port = int(os.environ.get('PORT', 8080))
-    web.run_app(app, host='0.0.0.0', port=port)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    logging.info(f"Running on http://0.0.0.0:{port}")
+    
+    # Держим приложение запущенным
+    await asyncio.Event().wait()
+
+def main():
+    try:
+        asyncio.run(start_app())
+    except KeyboardInterrupt:
+        logging.info("Bot stopped by user")
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
